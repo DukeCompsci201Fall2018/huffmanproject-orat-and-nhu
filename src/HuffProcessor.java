@@ -8,6 +8,7 @@
  * and including debug and bits read/written information
  * 
  * @author Owen Astrachan
+ * @author Nhu Do and Olivia Ratliff --> compsci 201 fall 2018
  */
 
 public class HuffProcessor {
@@ -59,12 +60,78 @@ public class HuffProcessor {
 	 *            Buffered bit stream writing to the output file.
 	 */
 	public void decompress(BitInputStream in, BitOutputStream out){
-
-		while (true){
-			int val = in.readBits(BITS_PER_WORD);
-			if (val == -1) break;
-			out.writeBits(BITS_PER_WORD, val);
+		
+		int bits = in.readBits(BITS_PER_INT);
+		if (bits!= HUFF_TREE) {  //wrong
+			throw new HuffException("illegal header starts with "+bits);
 		}
+		HuffNode root = readTreeHeader(in);
+		readCompressedBits(root,in,out);
 		out.close();
 	}
+	
+	/**
+	 * helper method
+	 * reading the tree to decompress
+	 * same as what is used to compress (written during compression)
+	 * preoder traversal
+	 * @param in
+	 * @return tree with decompressed bits
+	 */
+	private HuffNode readTreeHeader(BitInputStream in) {
+		//read a single bit
+		int bit = in.readBits(1);
+		
+		if (bit == -1) {
+			throw new HuffException("reading bits failed");
+		}
+		
+		if (bit == 0) {
+			HuffNode left = readTreeHeader(in);
+			HuffNode right = readTreeHeader(in);
+			return new HuffNode(0,0, left, right );
+		}
+		else {
+			int value = in.readBits(BITS_PER_WORD + 1);
+			return new HuffNode(value, 0);
+		}
+	}
+	/**
+	 * helper method
+	 * reads bits from compressed file
+	 * uses them to traverse root-to-leaf paths
+	 * writes lead into the output file
+	 * stop when PSEUDO_EOF
+	 * 
+	 * @param root
+	 * @param in
+	 * @param out
+	 */
+	private void readCompressedBits(HuffNode root, BitInputStream in, BitOutputStream out) {
+		
+		HuffNode current = root; 
+		while (true) {
+			int bits = in.readBits(1);
+			if (bits == -1) {
+				throw new HuffException("bad input, no PSEUDO_EOF");
+			}
+			else {
+				if (bits ==0) current = current.myLeft;
+				else current = current.myRight;
+				
+				if (current.myLeft  == null && current.myRight == null) {
+					if(current.myValue == PSEUDO_EOF) {
+						break;
+					}
+					else {
+						out.writeBits(BITS_PER_WORD, current.myValue);//write bits for current.value;
+						current = root; //starts back after leaf
+					}
+				}
+			}
+		}
+		
+	}
+	
+	
 }

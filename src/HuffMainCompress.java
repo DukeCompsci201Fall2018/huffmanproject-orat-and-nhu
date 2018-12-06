@@ -1,6 +1,8 @@
+
 import java.io.*;
 
 public class HuffMainCompress {
+
 	public static void main(String[] args) {
 		
 		System.out.println("Huffman Compress Main");
@@ -22,4 +24,5 @@ public class HuffMainCompress {
 		long diff = bis.bitsRead() - bos.bitsWritten();
 		System.out.printf("bits saved = %d\n",diff);
 	}
+	
 }
