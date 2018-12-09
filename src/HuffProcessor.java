@@ -63,16 +63,15 @@ public class HuffProcessor {
 		while(true) {
 			int index = in.readBits(BITS_PER_WORD);
 			if (index == -1) {
-				throw new HuffException("bad input, no PSEUDO_EOF");
+				break;
 			}
 			else {
-				if (index == PSEUDO_EOF) {
-					ret[PSEUDO_EOF] = 1;
-					break;
-				}
 				ret[index]++;
 			}
 		}
+		
+		ret[PSEUDO_EOF] = 1;
+		
 		return ret;
 	}
 	//step 2: From the frequencies, create the Huffman trie/tree 
@@ -144,11 +143,7 @@ public class HuffProcessor {
 		
 	}
 	
-	
-	
-	
-	
-	
+
 	/**
 	 * Decompresses a file. Output file must be identical bit-by-bit to the
 	 * original.
