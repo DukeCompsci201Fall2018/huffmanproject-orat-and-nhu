@@ -1,3 +1,4 @@
+import java.util.PriorityQueue;
 
 /**
  * Although this class has a history of several years,
@@ -42,14 +43,112 @@ public class HuffProcessor {
 	 *            Buffered bit stream writing to the output file.
 	 */
 	public void compress(BitInputStream in, BitOutputStream out){
-
-		while (true){
-			int val = in.readBits(BITS_PER_WORD);
-			if (val == -1) break;
-			out.writeBits(BITS_PER_WORD, val);
-		}
+		
+		int[] counts = readForCounts(in);
+		HuffNode root = makeTreeFromCounts(counts);
+		String[] codings = makeCodingsFromTree(root);
+		
+		out.writeBits(BITS_PER_INT, HUFF_TREE);
+		writeHeader(root, out);
+		
+		in.reset();
+		writeCompressedBits(codings, in, out);
 		out.close();
 	}
+	//step 1: Determine the frequency of every eight-bit 
+	//character/chunk in the file being compressed 
+	public int[] readForCounts(BitInputStream in) {
+		int[] ret = new int[ALPH_SIZE + 1];
+		
+		while(true) {
+			int index = in.readBits(BITS_PER_WORD);
+			if (index == -1) {
+				throw new HuffException("bad input, no PSEUDO_EOF");
+			}
+			else {
+				if (index == PSEUDO_EOF) {
+					ret[PSEUDO_EOF] = 1;
+					break;
+				}
+				ret[index]++;
+			}
+		}
+		return ret;
+	}
+	//step 2: From the frequencies, create the Huffman trie/tree 
+	//used to create encodings
+	public HuffNode makeTreeFromCounts(int[] counts) {
+		PriorityQueue<HuffNode> pq = new PriorityQueue<>();
+		
+		for (int i = 0; i < counts.length; i++) {
+			if (counts[i] != 0) {
+				pq.add(new HuffNode(i, counts[i], null, null));
+			}
+		}
+		while (pq.size() > 1) {
+			HuffNode left = pq.remove();
+			HuffNode right = pq.remove();
+			HuffNode newBoi = new HuffNode(0, left.myWeight + right.myWeight, left, right);
+			pq.add(newBoi);
+		}
+		HuffNode root = pq.remove();
+		
+		return root;
+	}
+	//step 3: From the trie/tree, create the encodings for each 
+	//eight-bit character chunk
+	public String[] makeCodingsFromTree(HuffNode root) {
+		String[] encodings = new String[ALPH_SIZE + 1];
+		String initialPath = "";
+		codingHelper(encodings, root, initialPath);
+
+		return encodings;
+	}
+	
+	public void codingHelper(String[] encodings, HuffNode root, String path) {
+		
+		if (root.myLeft == null && root.myRight == null) {
+			encodings[root.myValue] = path;
+			return;
+		}
+		else {
+			if (root.myLeft != null) codingHelper(encodings, root, path + "0");
+			if (root.myRight != null) codingHelper(encodings, root, path + "1");
+		}
+		return;
+	}
+	//step 4: Write the magic number and the tree to the 
+	//beginning/header of the compressed file
+	public void writeHeader(HuffNode root, BitOutputStream out) {
+		
+		if (root.myLeft != null || root.myRight != null) {
+			out.writeBits(1,  0);
+			writeHeader(root.myLeft, out);
+			writeHeader(root.myRight, out);
+		}
+		
+		if (root.myLeft == null && root.myRight == null) {
+			out.writeBits(1,  1);
+			out.writeBits(BITS_PER_WORD + 1, root.myValue);
+		}
+	}
+	//step 5:Read the file again and write the encoding for each 
+	//eight-bit chunk, followed by the encoding for PSEUDO_EOF, then 
+	//close the file being written
+	public void writeCompressedBits(String[] codings, BitInputStream in, BitOutputStream out) {
+		while (true) {
+			int current = in.readBits(8);
+			String code = codings[current];
+			out.writeBits(code.length(), Integer.parseInt(code,2));
+		}
+		
+	}
+	
+	
+	
+	
+	
+	
 	/**
 	 * Decompresses a file. Output file must be identical bit-by-bit to the
 	 * original.
@@ -71,8 +170,7 @@ public class HuffProcessor {
 	}
 	
 	/**
-	 * helper method
-	 * reading the tree to decompress
+	 * helper method reading the tree to decompress
 	 * same as what is used to compress (written during compression)
 	 * preoder traversal
 	 * @param in
@@ -96,6 +194,8 @@ public class HuffProcessor {
 			return new HuffNode(value, 0);
 		}
 	}
+	
+	
 	/**
 	 * helper method
 	 * reads bits from compressed file
@@ -116,7 +216,7 @@ public class HuffProcessor {
 				throw new HuffException("bad input, no PSEUDO_EOF");
 			}
 			else {
-				if (bits ==0) current = current.myLeft;
+				if (bits == 0) current = current.myLeft;
 				else current = current.myRight;
 				
 				if (current.myLeft  == null && current.myRight == null) {
