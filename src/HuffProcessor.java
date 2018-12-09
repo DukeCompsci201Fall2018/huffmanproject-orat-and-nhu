@@ -57,7 +57,7 @@ public class HuffProcessor {
 	}
 	//step 1: Determine the frequency of every eight-bit 
 	//character/chunk in the file being compressed 
-	public int[] readForCounts(BitInputStream in) {
+	private int[] readForCounts(BitInputStream in) {
 		int[] ret = new int[ALPH_SIZE + 1];
 		
 		while(true) {
@@ -76,7 +76,7 @@ public class HuffProcessor {
 	}
 	//step 2: From the frequencies, create the Huffman trie/tree 
 	//used to create encodings
-	public HuffNode makeTreeFromCounts(int[] counts) {
+	private HuffNode makeTreeFromCounts(int[] counts) {
 		PriorityQueue<HuffNode> pq = new PriorityQueue<>();
 		
 		for (int i = 0; i < counts.length; i++) {
@@ -96,29 +96,29 @@ public class HuffProcessor {
 	}
 	//step 3: From the trie/tree, create the encodings for each 
 	//eight-bit character chunk
-	public String[] makeCodingsFromTree(HuffNode root) {
+	private String[] makeCodingsFromTree(HuffNode root) {
 		String[] encodings = new String[ALPH_SIZE + 1];
 		String initialPath = "";
-		codingHelper(encodings, root, initialPath);
+		codingHelper(root, initialPath, encodings);
 
 		return encodings;
 	}
 	
-	public void codingHelper(String[] encodings, HuffNode root, String path) {
+	private void codingHelper(HuffNode root, String path, String[] encodings) {
 		
 		if (root.myLeft == null && root.myRight == null) {
 			encodings[root.myValue] = path;
 			return;
 		}
 		else {
-			if (root.myLeft != null) codingHelper(encodings, root, path + "0");
-			if (root.myRight != null) codingHelper(encodings, root, path + "1");
+			if (root.myLeft != null) codingHelper(root, path + "0", encodings);
+			if (root.myRight != null) codingHelper(root, path + "1", encodings);
 		}
 		return;
 	}
 	//step 4: Write the magic number and the tree to the 
 	//beginning/header of the compressed file
-	public void writeHeader(HuffNode root, BitOutputStream out) {
+	private void writeHeader(HuffNode root, BitOutputStream out) {
 		
 		if (root.myLeft != null || root.myRight != null) {
 			out.writeBits(1,  0);
@@ -134,7 +134,7 @@ public class HuffProcessor {
 	//step 5:Read the file again and write the encoding for each 
 	//eight-bit chunk, followed by the encoding for PSEUDO_EOF, then 
 	//close the file being written
-	public void writeCompressedBits(String[] codings, BitInputStream in, BitOutputStream out) {
+	private void writeCompressedBits(String[] codings, BitInputStream in, BitOutputStream out) {
 		while (true) {
 			int current = in.readBits(8);
 			if (current == -1) {
